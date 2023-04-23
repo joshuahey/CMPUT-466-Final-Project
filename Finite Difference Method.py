@@ -49,11 +49,6 @@ ax.plot_surface(X, Y, u.T, cmap='viridis')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 ax.set_zlabel('u')
-plt.show()
-
-plt.contourf(X, Y, u.T, cmap='viridis')
-plt.colorbar()
-plt.xlabel('x')
-plt.ylabel('y')
 plt.title('Solution to Laplace Equation')
 plt.show()
+
