@@ -1,7 +1,7 @@
-import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 %matplotlib notebook
+
 # Define the dimensions of the rectangle
 a, b = 1, 1
 
@@ -30,39 +30,55 @@ model = tf.keras.models.Model(inputs=input_layer, outputs=output_layer)
 loss_fn = tf.keras.losses.MeanSquaredError()
 optimizer = tf.keras.optimizers.Adam()
 
+def residual(u, x, y, dx, dy):
+    u_xx = (u[2:, 1:-1] - 2*u[1:-1, 1:-1] + u[:-2, 1:-1]) / dx**2
+    u_yy = (u[1:-1, 2:] - 2*u[1:-1, 1:-1] + u[1:-1, :-2]) / dy**2
+    r = u_xx + u_yy
+    # Add boundary conditions to the residual
+    r[0, :] = u[1, 1:-1] - 0  
+    r[-1, :] = u[-2, 1:-1] - 0  
+    r[:, 0] = u[1:-1, 1] - np.sin(np.pi*x[1:-1])  
+    r[:, -1] = u[1:-1, -2] - 0  
+    return r.reshape(-1, 1)
+
+# Define the residual loss function
+def residual_loss(u, x, y, dx, dy):
+    r = residual(u, x, y, dx, dy)
+    return np.mean(r**2)
+
+
 # Train the neural network
 for i in range(1000):
     with tf.GradientTape() as tape:
         y_pred = model(x_data.T)
-        loss = loss_fn(y_data, y_pred)
+        loss = loss_fn(y_data, y_pred) + residual_loss(u, x, y, dx, dy)
     gradients = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
     if i % 100 == 0:
         print(f"Step {i}, Loss: {loss.numpy():.4f}")
 
 # Evaluate the neural network
-u_pred = model(x_data.T).numpy().reshape(n, m)
+u_pred_pinn = model(x_data.T).numpy().reshape(n, m)
 
 # Plot the solution
 X, Y = np.meshgrid(x, y)
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
-plt.contourf(X, Y, u_pred, cmap='viridis')
-ax.plot_surface(X, Y, u_pred, cmap='viridis')
+plt.contourf(X, Y, u_pred_pinn, cmap='viridis')
+ax.plot_surface(X, Y, u_pred_pinn, cmap='viridis')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 ax.set_zlabel('u')
 plt.show()
-print(np.linalg.norm(u- u_pred))
+print(np.linalg.norm(u- u_pred_pinn))
+
 
 
 # With Train Test Validate Split and their Losses
-
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 %matplotlib notebook
-
 # Define the dimensions of the rectangle
 a, b = 1, 1
 
@@ -100,15 +116,28 @@ hidden_layer_2 = tf.keras.layers.Dense(32, activation='relu')(hidden_layer_1)
 output_layer = tf.keras.layers.Dense(1, activation=None)(hidden_layer_2)
 model = tf.keras.models.Model(inputs=input_layer, outputs=output_layer)
 
-# Define the loss function and optimizer
-loss_fn = tf.keras.losses.MeanSquaredError()
-optimizer = tf.keras.optimizers.Adam()
+def residual(u, x, y, dx, dy):
+    u_xx = (u[2:, 1:-1] - 2*u[1:-1, 1:-1] + u[:-2, 1:-1]) / dx**2
+    u_yy = (u[1:-1, 2:] - 2*u[1:-1, 1:-1] + u[1:-1, :-2]) / dy**2
+    r = u_xx + u_yy
+    # Add boundary conditions to the residual
+    r[0, :] = u[1, 1:-1] - 0  # u(0, y) = 0
+    r[-1, :] = u[-2, 1:-1] - 0  # u(1, y) = 0
+    r[:, 0] = u[1:-1, 1] - np.sin(np.pi*x[1:-1])  # u(x, 0) = sin(pi*x)
+    r[:, -1] = u[1:-1, -2] - 0  # u(x, 1) = 0
+    return r.reshape(-1, 1)
+
+# Define the residual loss function
+def residual_loss(u, x, y, dx, dy):
+    r = residual(u, x, y, dx, dy)
+    return np.mean(r**2)
+
 
 # Train the neural network
 for i in range(1000):
     with tf.GradientTape() as tape:
-        y_pred = model(x_train.T)
-        loss = loss_fn(y_train, y_pred)
+        y_pred = model(x_data.T)
+        loss = loss_fn(y_data, y_pred) + residual_loss(u, x, y, dx, dy)
     gradients = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
     if i % 100 == 0:
