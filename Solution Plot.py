@@ -1,7 +1,7 @@
 import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
-
+%matplotlib notebook
 # Define the dimensions of the rectangle
 a, b = 1, 1
 
