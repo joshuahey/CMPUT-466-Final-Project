@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.model_selection import ParameterGrid
+%matplotlib notebook
 
 # Define the dimensions of the rectangle
 a, b = 1, 1
@@ -16,60 +16,74 @@ dx, dy = a/(n-1), b/(m-1)
 x = np.linspace(0, a, n)
 y = np.linspace(0, b, m)
 
+
 # Define the input and output data for the neural network
 x_data = np.vstack((np.tile(x, m), np.repeat(y, n)))
 y_data = u.reshape(-1, 1)
 
+# Split the data into training, validation, and testing sets
+n_train = int(0.70 * n * m)
+n_val = int(0.15 * n * m)
+n_test = n * m - n_train - n_val
+idx = np.random.permutation(n * m)
+idx_train = idx[:n_train]
+idx_val = idx[n_train:n_train+n_val]
+idx_test = idx[n_train+n_val:]
+x_train, y_train = x_data[:, idx_train], y_data[idx_train]
+x_val, y_val = x_data[:, idx_val], y_data[idx_val]
+x_test, y_test = x_data[:, idx_test], y_data[idx_test]
+
 # Define the neural network architecture
-def build_model(hidden_layer_size, activation):
-    input_layer = tf.keras.layers.Input(shape=(2,))
-    hidden_layer_1 = tf.keras.layers.Dense(hidden_layer_size, activation=activation)(input_layer)
-    hidden_layer_2 = tf.keras.layers.Dense(hidden_layer_size, activation=activation)(hidden_layer_1)
-    output_layer = tf.keras.layers.Dense(1, activation=None)(hidden_layer_2)
-    model = tf.keras.models.Model(inputs=input_layer, outputs=output_layer)
-    return model
+input_layer = tf.keras.layers.Input(shape=(2,))
+hidden_layer_1 = tf.keras.layers.Dense(64, activation='relu')(input_layer)
+hidden_layer_2 = tf.keras.layers.Dense(64, activation='relu')(hidden_layer_1)
+output_layer = tf.keras.layers.Dense(1, activation=None)(hidden_layer_2)
+model = tf.keras.models.Model(inputs=input_layer, outputs=output_layer)
 
 # Define the loss function and optimizer
 loss_fn = tf.keras.losses.MeanSquaredError()
 optimizer = tf.keras.optimizers.Adam()
 
-# Define hyperparameters to tune
-param_grid = {'hidden_layer_size': [16, 32, 64], 'activation': ['relu', 'tanh']}
+# Train the neural network
+for i in range(100):
+    with tf.GradientTape() as tape:
+        y_pred = model(x_train.T)
+        loss = loss_fn(y_train, y_pred)
+    gradients = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    if i % 10 == 0:
+        print(f"Step {i}, Loss: {loss.numpy():.4f}")
 
-# Perform grid search over hyperparameters
-best_loss = np.inf
-for params in ParameterGrid(param_grid):
-    print(f"Training model with params: {params}")
-    model = build_model(**params)
-    for i in range(1000):
-        with tf.GradientTape() as tape:
-            y_pred = model(x_data.T)
-            loss = loss_fn(y_data, y_pred)
-        gradients = tape.gradient(loss, model.trainable_variables)
-        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-        if i % 250 == 0:
-            print(f"Step {i}, Loss: {loss.numpy():.4f}")
-    # Evaluate the model
-    u_pred = model(x_data.T).numpy().reshape(n, m)
-    l2_norm = np.linalg.norm(u - u_pred)
-    print(f"L2 norm for params {params}: {l2_norm:.4f}")
-    if loss.numpy() < best_loss:
-        best_loss = loss.numpy()
-        best_params = params
-        best_model = model
+# Evaluate the neural network on the training set
+u_train = model(x_train.T).numpy().reshape(-1, 1)
+train_loss = loss_fn(y_train, u_train)
+print(f"Training Loss: {train_loss.numpy():.4f}")
 
-# Evaluate the best model
-u_pred = best_model(x_data.T).numpy().reshape(n, m)
 
-# Plot the solution
+# Evaluate the neural network on the validation set
+u_val = model(x_val.T).numpy().reshape(-1, 1)
+val_loss = loss_fn(y_val, u_val)
+print(f"Validation Loss: {val_loss.numpy():.4f}")
+
+# Evaluate the neural network on the testing set
+u_test = model(x_test.T).numpy().reshape(-1, 1)
+test_loss = loss_fn(y_test, u_test)
+print(f"Testing Loss: {test_loss.numpy():.4f}")
+
+X_test, Y_test = np.meshgrid(x_test, y_test)
+
+# Create a meshgrid for the entire domain
 X, Y = np.meshgrid(x, y)
+
+# Create a meshgrid for the predicted u values on the testing set
+U_test = np.zeros((n, m))
+U_test[idx_test // m, idx_test % m] = u_test.reshape(-1)
+# Plot the entire domain with the predicted u values on the testing set
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
-plt.contourf(X, Y, u_pred, cmap='viridis')
-ax.plot_surface(X, Y, u_pred, cmap='viridis')
+ax.plot_surface(X, Y, U_test, cmap='viridis')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
 ax.set_zlabel('u')
+ax.set_title('Entire Domain with Predicted u Values on Test Set')
 plt.show()
-print(f"Best parameters: {best_params}")
-print(f"L2 norm for best model: {np.linalg.norm(u - u_pred):.4f}")
