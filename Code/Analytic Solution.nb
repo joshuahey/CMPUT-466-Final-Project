@@ -1,0 +1,8 @@
+In[1]:= pde = Laplacian[u[x, y],{x, y}] == 0;
+        bcsinx = u[0,y] == 0 && u[1,y] == 0 ;
+        bcsiny = u[x, 0] == Sin[Pi*x]&& u[x,1] == 0 ;
+        solution = DSolveValue[pde && bcsinx && bcsiny, u[x, y], {x, y}]//FullSimplify
+        Plot3D[Evaluate[N[ solution]], {x, 0, 1}, {y, 0, 1}, Sequence[
+         AxesLabel -> Automatic, PlotRange -> All, 
+          ColorFunction -> "TemperatureMap"]]
+Out[1] = Csch[Pi]Sin[Pix]Sinh[Pi-Piy]
